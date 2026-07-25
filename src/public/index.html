@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevPilot IA - Workspace</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>🤖 DevPilot IA</h2>
+        <button id="new-chat-btn" class="btn-new-chat">➕ Novo Chat</button>
+      </div>
+
+      <div class="sessions-label">Sua lista de chats</div>
+      <ul id="sessions-list" class="sessions-list">
+        <!-- Lista de chats gerada via JS -->
+      </ul>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL DO CHAT -->
+    <main class="chat-container">
+      <header class="chat-header">
+        <div class="header-title">
+          <h1 id="current-chat-title">Conversa Atual</h1>
+          <span class="status-online">Online</span>
+        </div>
+
+        <div class="header-controls">
+          <select id="persona-select" class="persona-dropdown">
+            <option value="general">🤖 DevPilot Geral</option>
+            <option value="python">🐍 Especialista Python</option>
+            <option value="devops">🚀 DevOps Júnior</option>
+            <option value="reviewer">🔍 Revisor de Código</option>
+            <option value="sap">📦 Especialista SAP (PP/MM)</option>
+          </select>
+
+          <!-- BOTÕES DE EXPORTAR -->
+          <button id="export-md-btn" class="btn-export" title="Exportar como Markdown">📄 .MD</button>
+          <button id="export-pdf-btn" class="btn-export" title="Salvar / Imprimir PDF">🖨️ PDF</button>
+
+          <button id="clear-btn" class="btn-secondary">🗑️ Apagar Chat</button>
+        </div>
+      </header>
+
+      <div id="chat-messages" class="chat-messages">
+        <div class="message assistant">
+          <div class="bubble">Olá! Selecione uma conversa, digite, use voz ou anexe arquivos!</div>
+        </div>
+      </div>
+
+      <!-- Indicador de arquivo anexado -->
+      <div id="file-preview" class="file-preview hidden">
+        <span>📄 <strong id="file-name"></strong></span>
+        <button id="remove-file-btn">✕</button>
+      </div>
+
+      <form id="chat-form" class="chat-input-area">
+        <input type="file" id="file-input" accept=".txt,.csv,.json,.py,.js,.html,.css,.md" style="display: none;" />
+        
+        <button type="button" id="attach-btn" class="btn-icon" title="Anexar arquivo">📎</button>
+        <button type="button" id="mic-btn" class="btn-icon" title="Ditar por voz">🎙️</button>
+        
+        <input 
+          type="text" 
+          id="user-input" 
+          placeholder="Digite sua mensagem, dite ou anexe um arquivo..." 
+          autocomplete="off" 
+        />
+        <button type="submit" id="send-btn">Enviar</button>
+      </form>
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

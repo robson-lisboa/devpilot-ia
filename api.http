@@ -1,0 +1,31 @@
+### Teste 1: Prompt Simples (Sucesso)
+POST http://localhost:3000/api/ai/generate
+Content-Type: application/json
+
+{
+  "prompt": "Escreva um script simples em Python para ler um arquivo JSON."
+}
+
+###
+
+### Teste 2: Histórico de Conversa (Com Memória)
+POST http://localhost:3000/api/ai/generate
+Content-Type: application/json
+
+{
+  "messages": [
+    { "role": "user", "content": "Estou criando uma API em Node.js." },
+    { "role": "assistant", "content": "Que legal! Como posso te ajudar?" },
+    { "role": "user", "content": "Qual tecnologia acabei de mencionar?" }
+  ]
+}
+
+###
+
+### Teste 3: Teste de Validação (Erro 400 Tratado)
+POST http://localhost:3000/api/ai/generate
+Content-Type: application/json
+
+{
+  "prompt": ""
+}
