@@ -370,3 +370,57 @@ button[type="submit"]:hover {
     background-color: #f9f9f9 !important;
   }
 }
+
+/* ================= RESPONSIVIDADE PARA CELULARES ================= */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 120px;
+    padding: 10px;
+  }
+
+  .sessions-list {
+    display: none;
+  }
+
+  .chat-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .header-controls {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .persona-dropdown, .btn-export, .btn-secondary {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  .chat-input-area {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  #user-input {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .btn-icon {
+    font-size: 1rem;
+    padding: 8px;
+  }
+}
