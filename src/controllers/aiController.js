@@ -57,6 +57,12 @@ Sempre termine sua resposta com UMA pergunta prática e focada no cenário real 
 
 const generateResponse = async (req, res) => {
   try {
+    // 🛡️ Captura o guestId enviado pelo cabeçalho
+    const guestId = req.headers['x-guest-id'];
+    if (!guestId) {
+      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    }
+
     // 💡 Extrai também o campo pdfPath
     const { messages, prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile', pdfPath } = req.body;
 
@@ -74,7 +80,7 @@ const generateResponse = async (req, res) => {
       try {
         const pdfText = await extractTextFromPDF(pdfPath);
         pdfContext = `\n\n[DOCUMENTO PDF ANEXADO PELO USUÁRIO]:\n"""\n${pdfText.slice(0, 4000)}\n"""\n`;
-        logger.info(`Texto extraído do PDF com sucesso para a sessão ${sessionId}.`);
+        logger.info(`Texto extraído do PDF com sucesso para a sessão ${sessionId} (Guest: ${guestId}).`);
       } catch (pdfError) {
         logger.error(`Erro ao ler PDF fornecido (${pdfPath}): ${pdfError.message}`);
       }
@@ -131,7 +137,7 @@ const generateResponse = async (req, res) => {
       });
     }
 
-    logger.info(`Iniciando streaming [Modelo: ${model}] [Persona: ${persona}] [Sessão: ${sessionId}]...`);
+    logger.info(`Iniciando streaming [Guest: ${guestId}] [Modelo: ${model}] [Persona: ${persona}] [Sessão: ${sessionId}]...`);
 
     // Configura os cabeçalhos para resposta em fluxo contínuo (Streaming)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -160,22 +166,22 @@ const generateResponse = async (req, res) => {
     // Finaliza o envio do fluxo de dados HTTP
     res.end();
 
-    // --- SALVAR NO SQLITE AO FINAL DA TRANSMISSÃO ---
+    // --- SALVAR NO SQLITE VINCULADO AO GUEST_ID AO FINAL DA TRANSMISSÃO ---
     const db = await getDb();
     const lastUserMessage = conversationHistory.filter(m => m.role === 'user').pop();
 
     if (lastUserMessage) {
       await db.run(
-        'INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)',
-        [sessionId, 'user', lastUserMessage.content]
+        'INSERT INTO messages (session_id, guest_id, role, content) VALUES (?, ?, ?, ?)',
+        [sessionId, guestId, 'user', lastUserMessage.content]
       );
       await db.run(
-        'INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)',
-        [sessionId, 'assistant', fullAiResponse]
+        'INSERT INTO messages (session_id, guest_id, role, content) VALUES (?, ?, ?, ?)',
+        [sessionId, guestId, 'assistant', fullAiResponse]
       );
     }
 
-    logger.info(`Streaming concluído com sucesso e histórico salvo no SQLite.`);
+    logger.info(`Streaming concluído com sucesso e histórico salvo no SQLite para o Guest: ${guestId}.`);
 
   } catch (error) {
     logger.error(`Erro no streaming (aiController): ${error.message}`);
@@ -192,11 +198,16 @@ const generateResponse = async (req, res) => {
 
 const getHistory = async (req, res) => {
   try {
+    const guestId = req.headers['x-guest-id'];
+    if (!guestId) {
+      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    }
+
     const { sessionId = 'default' } = req.params;
     const db = await getDb();
     const history = await db.all(
-      'SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC',
-      [sessionId]
+      'SELECT role, content FROM messages WHERE session_id = ? AND guest_id = ? ORDER BY id ASC',
+      [sessionId, guestId]
     );
     return res.json({ success: true, history });
   } catch (error) {
@@ -207,12 +218,17 @@ const getHistory = async (req, res) => {
 
 const clearHistory = async (req, res) => {
   try {
+    const guestId = req.headers['x-guest-id'];
+    if (!guestId) {
+      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    }
+
     const { sessionId = 'default' } = req.params;
     const db = await getDb();
     
-    await db.run('DELETE FROM messages WHERE session_id = ?', [sessionId]);
+    await db.run('DELETE FROM messages WHERE session_id = ? AND guest_id = ?', [sessionId, guestId]);
     
-    logger.info(`Histórico da sessão ${sessionId} removido do banco SQLite com sucesso.`);
+    logger.info(`Histórico da sessão ${sessionId} do Guest ${guestId} removido do banco SQLite com sucesso.`);
     return res.json({ success: true, message: 'Histórico apagado com sucesso!' });
   } catch (error) {
     logger.error(`Erro ao apagar histórico: ${error.message}`);

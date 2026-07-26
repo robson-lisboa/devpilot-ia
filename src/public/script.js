@@ -1,3 +1,15 @@
+// --- GESTÃO DE IDENTIDADE ANÔNIMA (GUEST SESSION) ---
+function getGuestId() {
+  let guestId = localStorage.getItem('devpilot_guest_id');
+  if (!guestId) {
+    guestId = 'guest_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    localStorage.setItem('devpilot_guest_id', guestId);
+  }
+  return guestId;
+}
+
+const currentGuestId = getGuestId();
+
 // --- ELEMENTOS DO DOM ---
 const chatForm = document.getElementById('chat-form');
 const userInput = document.getElementById('user-input');
@@ -37,7 +49,6 @@ if (!currentSessionId || sessions.length === 0) {
   currentSessionId = `session_${Date.now()}`;
   sessions = [{ id: currentSessionId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' }];
 } else {
-  // Garante que o ID salvo no activeSessionId realmente existe na lista de sessões
   const exists = sessions.some(s => s.id === currentSessionId);
   if (!exists) {
     currentSessionId = sessions[0]?.id || `session_${Date.now()}`;
@@ -136,7 +147,12 @@ function saveSessionsToStorage() {
 
 async function deleteSession(idToDelete) {
   try {
-    await fetch(`/api/ai/history/${idToDelete}`, { method: 'DELETE' });
+    await fetch(`/api/ai/history/${idToDelete}`, { 
+      method: 'DELETE',
+      headers: {
+        'X-Guest-ID': currentGuestId
+      }
+    });
   } catch (err) {
     console.error('Erro ao apagar mensagens no servidor:', err);
   }
@@ -318,7 +334,11 @@ function clearAttachedFile() {
 // --- CARREGAR HISTÓRICO DO SERVIDOR ---
 async function loadHistory() {
   try {
-    const res = await fetch(`/api/ai/history/${currentSessionId}`);
+    const res = await fetch(`/api/ai/history/${currentSessionId}`, {
+      headers: {
+        'X-Guest-ID': currentGuestId
+      }
+    });
     const data = await res.json();
 
     chatMessages.innerHTML = '';
@@ -346,7 +366,7 @@ async function loadHistory() {
 // Inicializa a interface mantendo o estado
 saveSessionsToStorage();
 renderSidebar();
-loadHistory(); // Carrega o histórico da sessão atual em vez de resetar para um chat limpo
+loadHistory();
 
 // --- ENVIO DA MENSAGEM COM STREAMING ---
 chatForm?.addEventListener('submit', async (e) => {
@@ -387,7 +407,10 @@ chatForm?.addEventListener('submit', async (e) => {
   try {
     const response = await fetch('/api/ai/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Guest-ID': currentGuestId
+      },
       body: JSON.stringify({ 
         messages: conversationHistory, 
         persona: personaSelect.value, 
@@ -441,7 +464,6 @@ clearBtn?.addEventListener('click', async () => {
 
 // --- ATALHOS DE TECLADO ---
 document.addEventListener('keydown', (e) => {
-  // Ctrl + Enter para enviar mensagem
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     if (document.activeElement === userInput) {
       e.preventDefault();
@@ -449,13 +471,11 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // Ctrl + Shift + O para criar um novo chat
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
     e.preventDefault();
     newChatBtn?.click();
   }
 
-  // Esc para cancelar gravador de voz ou remover anexo
   if (e.key === 'Escape') {
     if (isRecording) {
       recognition?.stop();
