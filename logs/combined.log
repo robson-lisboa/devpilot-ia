@@ -69,3 +69,9 @@
 [2026-07-25 01:52:13] [INFO]: Histórico da sessão session_1784953874325 removido do banco SQLite com sucesso.
 [2026-07-25 01:53:36] [INFO]: Iniciando streaming [Persona: reviewer] [Sessão: session_1784955133691]...
 [2026-07-25 01:53:39] [INFO]: Streaming concluído com sucesso e histórico salvo no SQLite.
+[2026-07-25 02:17:54] [INFO]: Iniciando streaming [Persona: devops] [Sessão: session_1784956620296]...
+[2026-07-25 02:17:56] [INFO]: Streaming concluído com sucesso e histórico salvo no SQLite.
+[2026-07-25 02:20:44] [INFO]: Iniciando streaming [Persona: general] [Sessão: session_1784956620296]...
+[2026-07-25 02:20:45] [INFO]: Streaming concluído com sucesso e histórico salvo no SQLite.
+[2026-07-26 14:20:55] [INFO]: Histórico da sessão session_1785084628210 removido do banco SQLite com sucesso.
+[2026-07-26 14:20:59] [INFO]: Histórico da sessão session_1784956620296 removido do banco SQLite com sucesso.

@@ -21,14 +21,17 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// 3. Middlewares para JSON e arquivos estáticos da interface web
-app.use(express.json());
-app.use(express.static('src/public')); // <--- Serve o HTML/CSS/JS da pasta public
+// 3. Middlewares com limite ampliado para suportar histórico extenso e anexos de arquivos
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Serve o HTML/CSS/JS da pasta public
+app.use(express.static('src/public'));
 
 // 4. Rotas de API
 app.use('/api/ai', aiRoutes);
 
-// 5. Rota de saúde/status da API (em um endereço próprio para não encavalar com o index.html)
+// 5. Rota de saúde/status da API
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: '🤖 Servidor DevPilot IA operando normalmente!' });
 });
