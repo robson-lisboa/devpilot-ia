@@ -25,10 +25,15 @@ const removeFileBtn = document.getElementById('remove-file-btn');
 
 // --- ESTADO DA APLICAÇÃO ---
 let conversationHistory = [];
-let currentSessionId = localStorage.getItem('activeSessionId') || 'session_1';
-let sessions = JSON.parse(localStorage.getItem('chatSessions')) || [
-  { id: 'session_1', title: 'Chat Inicial', persona: 'general' }
-];
+
+// ✅ Gera uma nova sessão toda vez que a página/IA é aberta
+let currentSessionId = `session_${Date.now()}`;
+let sessions = JSON.parse(localStorage.getItem('chatSessions')) || [];
+
+// Garante que a sessão atual recém-criada esteja na lista
+if (!sessions.some(s => s.id === currentSessionId)) {
+  sessions.unshift({ id: currentSessionId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' });
+}
 
 let attachedFileContent = null;
 let attachedFileName = '';
@@ -120,7 +125,7 @@ function saveSessionsToStorage() {
   localStorage.setItem('activeSessionId', currentSessionId);
 }
 
-// Função auxiliar para deletar a sessão
+// Função para deletar a sessão
 async function deleteSession(idToDelete) {
   try {
     await fetch(`/api/ai/history/${idToDelete}`, { method: 'DELETE' });
@@ -128,30 +133,41 @@ async function deleteSession(idToDelete) {
     console.error('Erro ao apagar mensagens no servidor:', err);
   }
 
-  // Filtra removendo o ID solicitado
+  // Remove a sessão deletada da lista
   sessions = sessions.filter(s => s.id !== idToDelete);
 
-  // Se apagou todas as conversas, cria uma padrão
-  if (sessions.length === 0) {
-    const newId = `session_${Date.now()}`;
-    sessions = [{ id: newId, title: 'Chat 1', persona: personaSelect.value || 'general' }];
-    currentSessionId = newId;
-  } else if (currentSessionId === idToDelete) {
-    // Se apagou a conversa que estava aberta, muda a seleção para a primeira disponível
-    currentSessionId = sessions[0].id;
+  // Se a sessão deletada for a que está aberta na tela
+  if (currentSessionId === idToDelete) {
+    if (sessions.length > 0) {
+      currentSessionId = sessions[0].id;
+      loadHistory();
+    } else {
+      // Cria uma nova sessão limpa se não restar nenhuma
+      const newId = `session_${Date.now()}`;
+      sessions = [{ id: newId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' }];
+      currentSessionId = newId;
+      resetChatArea();
+    }
   }
 
   saveSessionsToStorage();
   renderSidebar();
-  loadHistory();
+}
+
+function resetChatArea() {
+  conversationHistory = [];
+  chatMessages.innerHTML = `
+    <div class="message assistant">
+      <div class="bubble">Este chat está limpo. Mande sua dúvida ou anexe um arquivo!</div>
+    </div>
+  `;
 }
 
 function renderSidebar() {
   sessionsListEl.innerHTML = '';
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
-  // Atualiza o select de persona conforme a sessão ativa
-  if (currentSession && currentSession.persona) {
+  if (currentSession && currentSession.persona && personaSelect) {
     personaSelect.value = currentSession.persona;
   }
 
@@ -166,7 +182,6 @@ function renderSidebar() {
     titleSpan.style.flex = '1';
     titleSpan.style.cursor = 'pointer';
 
-    // Botão de deletar conversa individual na sidebar
     const deleteBtn = document.createElement('button');
     deleteBtn.innerHTML = '🗑️';
     deleteBtn.style.background = 'transparent';
@@ -188,7 +203,7 @@ function renderSidebar() {
 
     if (session.id === currentSessionId) {
       li.classList.add('active');
-      currentChatTitle.innerText = session.title;
+      if (currentChatTitle) currentChatTitle.innerText = session.title;
     }
 
     titleSpan.addEventListener('click', () => {
@@ -206,7 +221,6 @@ function renderSidebar() {
   });
 }
 
-// Salva a alteração da persona diretamente na sessão ativa
 personaSelect?.addEventListener('change', () => {
   const currentSession = sessions.find(s => s.id === currentSessionId);
   if (currentSession) {
@@ -218,20 +232,14 @@ personaSelect?.addEventListener('change', () => {
 newChatBtn?.addEventListener('click', () => {
   const newId = `session_${Date.now()}`;
   const newTitle = `Chat ${sessions.length + 1}`;
-  const currentPersona = personaSelect.value || 'general';
+  const currentPersona = personaSelect?.value || 'general';
 
-  sessions.push({ id: newId, title: newTitle, persona: currentPersona });
+  sessions.unshift({ id: newId, title: newTitle, persona: currentPersona });
   currentSessionId = newId;
 
   saveSessionsToStorage();
   renderSidebar();
-
-  conversationHistory = [];
-  chatMessages.innerHTML = `
-    <div class="message assistant">
-      <div class="bubble">Novo chat iniciado! Como posso te ajudar?</div>
-    </div>
-  `;
+  resetChatArea();
 });
 
 // --- RENDERIZAÇÃO DE MENSAGENS E CÓDIGO ---
@@ -322,22 +330,20 @@ async function loadHistory() {
         }
       });
     } else {
-      chatMessages.innerHTML = `
-        <div class="message assistant">
-          <div class="bubble">Este chat está limpo. Mande sua dúvida ou anexe um arquivo!</div>
-        </div>
-      `;
+      resetChatArea();
     }
   } catch (err) {
     console.error('Erro ao carregar histórico:', err);
+    resetChatArea();
   }
 }
 
-// Inicializa a interface
+// Inicializa a interface limpa
+saveSessionsToStorage();
 renderSidebar();
-loadHistory();
+resetChatArea();
 
-// --- ENVIO DA MENSAGEM COM STREAMING EM TEMPO REAL ---
+// --- ENVIO DA MENSAGEM COM STREAMING ---
 chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   let text = userInput.value.trim();
@@ -357,9 +363,8 @@ chatForm?.addEventListener('submit', async (e) => {
   appendMessage('user', userDisplayMessage);
   userInput.value = '';
 
-  // Atualiza título da sessão automaticamente se for o primeiro envio
   const activeSessionObj = sessions.find(s => s.id === currentSessionId);
-  if (activeSessionObj && activeSessionObj.title.startsWith('Chat ') && text) {
+  if (activeSessionObj && (activeSessionObj.title === 'Chat Inicial' || activeSessionObj.title.startsWith('Chat ')) && text) {
     activeSessionObj.title = text.substring(0, 22) + '...';
     saveSessionsToStorage();
     renderSidebar();
@@ -371,7 +376,6 @@ chatForm?.addEventListener('submit', async (e) => {
   sendBtn.disabled = true;
   userInput.disabled = true;
 
-  // Cria a bolha da mensagem do assistente que receberá o texto em tempo real
   const assistantMessageDiv = appendMessage('assistant', '');
   const bubbleDiv = assistantMessageDiv.querySelector('.bubble');
 
@@ -390,7 +394,6 @@ chatForm?.addEventListener('submit', async (e) => {
       throw new Error('Falha ao obter resposta do servidor.');
     }
 
-    // Leitor do fluxo de dados (Stream Reader)
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let aiFullResponse = '';
@@ -402,11 +405,9 @@ chatForm?.addEventListener('submit', async (e) => {
       const chunk = decoder.decode(value, { stream: true });
       aiFullResponse += chunk;
 
-      // Renderiza Markdown e atualiza o conteúdo ao vivo
       const formatted = window.marked ? marked.parse(aiFullResponse) : aiFullResponse;
       bubbleDiv.innerHTML = formatted;
 
-      // Destaca sintaxe de código em tempo real
       bubbleDiv.querySelectorAll('pre code').forEach((block) => {
         if (window.hljs) hljs.highlightElement(block);
         addCopyButton(block.parentElement);
@@ -415,7 +416,6 @@ chatForm?.addEventListener('submit', async (e) => {
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // Adiciona a resposta completa final no histórico local
     conversationHistory.push({ role: 'assistant', content: aiFullResponse });
 
   } catch (err) {
@@ -428,7 +428,7 @@ chatForm?.addEventListener('submit', async (e) => {
   }
 });
 
-// --- APAGAR SESSÃO ATUAL E REMOVER DA SIDEBAR ---
+// --- APAGAR SESSÃO ATUAL ---
 clearBtn?.addEventListener('click', async () => {
   if (!confirm('Deseja realmente apagar esta conversa da lista?')) return;
   deleteSession(currentSessionId);
