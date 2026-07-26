@@ -2,7 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 const aiRoutes = require('./src/routes/aiRoutes');
+
+// --- 🛡️ BLINDAGEM GLOBAL DO SERVIDOR (Impede quedas por exceções inesperadas) ---
+process.on('uncaughtException', (error) => {
+  console.error('🔥 ERRO CRÍTICO NÃO TRATADO (O servidor continuará rodando):', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 PROMESSA REJEITADA NÃO TRATADA:', reason);
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,8 +35,8 @@ app.use('/api', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Serve o HTML/CSS/JS da pasta public
-app.use(express.static('src/public'));
+// Serve o HTML/CSS/JS da pasta public (ajustado com path.join para segurança de diretório)
+app.use(express.static(path.join(__dirname, 'src/public')));
 
 // 4. Rotas de API
 app.use('/api/ai', aiRoutes);
@@ -34,6 +44,15 @@ app.use('/api/ai', aiRoutes);
 // 5. Rota de saúde/status da API
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: '🤖 Servidor DevPilot IA operando normalmente!' });
+});
+
+// 6. Middleware Global de Erros do Express (Captura falhas em rotas e mantém o app ativo)
+app.use((err, req, res, next) => {
+  console.error('❌ Erro capturado pelo middleware do Express:', err.stack);
+  res.status(500).json({
+    success: false,
+    error: 'Ocorreu um erro interno no servidor, mas a aplicação continua ativa.'
+  });
 });
 
 app.listen(PORT, () => {
