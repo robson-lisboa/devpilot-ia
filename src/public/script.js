@@ -26,7 +26,7 @@ const removeFileBtn = document.getElementById('remove-file-btn');
 // --- ESTADO DA APLICAÇÃO ---
 let conversationHistory = [];
 
-// ✅ Gera uma nova sessão toda vez que a página/IA é aberta
+// Gera uma nova sessão toda vez que a página/IA é aberta
 let currentSessionId = `session_${Date.now()}`;
 let sessions = JSON.parse(localStorage.getItem('chatSessions')) || [];
 
@@ -125,7 +125,6 @@ function saveSessionsToStorage() {
   localStorage.setItem('activeSessionId', currentSessionId);
 }
 
-// Função para deletar a sessão
 async function deleteSession(idToDelete) {
   try {
     await fetch(`/api/ai/history/${idToDelete}`, { method: 'DELETE' });
@@ -133,16 +132,13 @@ async function deleteSession(idToDelete) {
     console.error('Erro ao apagar mensagens no servidor:', err);
   }
 
-  // Remove a sessão deletada da lista
   sessions = sessions.filter(s => s.id !== idToDelete);
 
-  // Se a sessão deletada for a que está aberta na tela
   if (currentSessionId === idToDelete) {
     if (sessions.length > 0) {
       currentSessionId = sessions[0].id;
       loadHistory();
     } else {
-      // Cria uma nova sessão limpa se não restar nenhuma
       const newId = `session_${Date.now()}`;
       sessions = [{ id: newId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' }];
       currentSessionId = newId;
@@ -432,4 +428,31 @@ chatForm?.addEventListener('submit', async (e) => {
 clearBtn?.addEventListener('click', async () => {
   if (!confirm('Deseja realmente apagar esta conversa da lista?')) return;
   deleteSession(currentSessionId);
+});
+
+// --- ATALHOS DE TECLADO ---
+document.addEventListener('keydown', (e) => {
+  // Ctrl + Enter para enviar mensagem
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (document.activeElement === userInput) {
+      e.preventDefault();
+      chatForm?.requestSubmit();
+    }
+  }
+
+  // Ctrl + Shift + O para criar um novo chat
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
+    e.preventDefault();
+    newChatBtn?.click();
+  }
+
+  // Esc para cancelar gravador de voz ou remover anexo
+  if (e.key === 'Escape') {
+    if (isRecording) {
+      recognition?.stop();
+      stopRecording();
+    } else if (attachedFileContent) {
+      clearAttachedFile();
+    }
+  }
 });
