@@ -1,0 +1,14 @@
+services:
+  devpilot-app:
+    build: .
+    container_name: devpilot_ia_container
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    env_file:
+      - .env
+    volumes:
+      - ./database.sqlite:/app/database.sqlite
+    restart: always

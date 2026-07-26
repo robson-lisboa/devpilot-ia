@@ -55,7 +55,8 @@ Sempre termine sua resposta com UMA pergunta prática e focada no cenário real 
 
 const generateResponse = async (req, res) => {
   try {
-    const { messages, prompt, persona = 'general', sessionId = 'default' } = req.body;
+    // 💡 Extrai o campo 'model' vindo da requisição (com fallback padrão)
+    const { messages, prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile' } = req.body;
 
     if (!req.body || Object.keys(req.body).length === 0) {
       logger.warn('Tentativa de requisição com corpo vazio.');
@@ -101,17 +102,17 @@ const generateResponse = async (req, res) => {
       });
     }
 
-    logger.info(`Iniciando streaming [Persona: ${persona}] [Sessão: ${sessionId}]...`);
+    logger.info(`Iniciando streaming [Modelo: ${model}] [Persona: ${persona}] [Sessão: ${sessionId}]...`);
 
     // Configura os cabeçalhos para resposta em fluxo contínuo (Streaming)
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // Chamada à API Groq habilitando o modo stream
+    // Chamada à API Groq utilizando o modelo dinâmico
     const stream = await groq.chat.completions.create({
       messages: conversationHistory,
-      model: 'llama-3.3-70b-versatile',
+      model: model, // 🚀 Agora utiliza o modelo dinâmico selecionado no front-end
       temperature: 0.7,
       stream: true,
     });
