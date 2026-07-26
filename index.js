@@ -41,8 +41,8 @@ app.use(express.static(path.join(__dirname, 'src/public')));
 // 4. Rotas de API
 app.use('/api/ai', aiRoutes);
 
-// 5. Rota de saúde/status da API
-app.get('/health', (req, res) => {
+// 5. Rota de saúde/status da API (inclui /health e /ping para compatibilidade total com o UptimeRobot)
+app.get(['/health', '/ping'], (req, res) => {
   res.json({ status: 'OK', message: '🤖 Servidor DevPilot IA operando normalmente!' });
 });
 
