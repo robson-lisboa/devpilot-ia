@@ -2,6 +2,8 @@ require('dotenv').config();
 const Groq = require('groq-sdk');
 const logger = require('../utils/logger');
 const getDb = require('../config/database');
+// 📄 Importa o utilitário de leitura de PDF
+const { extractTextFromPDF } = require('../services/pdfReader');
 
 const groq = new Groq({ 
   apiKey: process.env.GROQ_API_KEY 
@@ -55,8 +57,8 @@ Sempre termine sua resposta com UMA pergunta prática e focada no cenário real 
 
 const generateResponse = async (req, res) => {
   try {
-    // 💡 Extrai o campo 'model' vindo da requisição (com fallback padrão)
-    const { messages, prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile' } = req.body;
+    // 💡 Extrai também o campo pdfPath
+    const { messages, prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile', pdfPath } = req.body;
 
     if (!req.body || Object.keys(req.body).length === 0) {
       logger.warn('Tentativa de requisição com corpo vazio.');
@@ -64,6 +66,18 @@ const generateResponse = async (req, res) => {
         success: false,
         error: 'O corpo da requisição não pode estar vazio.' 
       });
+    }
+
+    // 📄 Processa o arquivo PDF se o caminho for informado no corpo da requisição
+    let pdfContext = "";
+    if (pdfPath) {
+      try {
+        const pdfText = await extractTextFromPDF(pdfPath);
+        pdfContext = `\n\n[DOCUMENTO PDF ANEXADO PELO USUÁRIO]:\n"""\n${pdfText.slice(0, 4000)}\n"""\n`;
+        logger.info(`Texto extraído do PDF com sucesso para a sessão ${sessionId}.`);
+      } catch (pdfError) {
+        logger.error(`Erro ao ler PDF fornecido (${pdfPath}): ${pdfError.message}`);
+      }
     }
 
     let conversationHistory = [];
@@ -81,7 +95,19 @@ const generateResponse = async (req, res) => {
           error: 'O array "messages" não pode estar vazio.' 
         });
       }
-      conversationHistory = [systemInstruction, ...messages];
+      
+      const formattedMessages = [...messages];
+      if (pdfContext && formattedMessages.length > 0) {
+        const lastIdx = formattedMessages.length - 1;
+        if (formattedMessages[lastIdx].role === 'user') {
+          formattedMessages[lastIdx] = {
+            ...formattedMessages[lastIdx],
+            content: `${pdfContext}${formattedMessages[lastIdx].content}`
+          };
+        }
+      }
+
+      conversationHistory = [systemInstruction, ...formattedMessages];
     } else if (prompt && typeof prompt === 'string') {
       if (prompt.trim().length === 0) {
         logger.warn('Prompt enviado contendo apenas espaços.');
@@ -90,9 +116,12 @@ const generateResponse = async (req, res) => {
           error: 'O campo "prompt" não pode conter apenas espaços em branco.' 
         });
       }
+      
+      const finalPrompt = `${pdfContext}${prompt.trim()}`;
+
       conversationHistory = [
         systemInstruction,
-        { role: 'user', content: prompt.trim() }
+        { role: 'user', content: finalPrompt }
       ];
     } else {
       logger.warn('Requisição enviada sem os campos obrigatórios.');
@@ -112,14 +141,14 @@ const generateResponse = async (req, res) => {
     // Chamada à API Groq utilizando o modelo dinâmico
     const stream = await groq.chat.completions.create({
       messages: conversationHistory,
-      model: model, // 🚀 Agora utiliza o modelo dinâmico selecionado no front-end
+      model: model,
       temperature: 0.7,
       stream: true,
     });
 
     let fullAiResponse = '';
 
-    // Transmite cada bloco (chunk) de texto recebido diretamente para a resposta HTTP
+    // Transmite cada bloco de texto recebido diretamente para a resposta HTTP
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
       if (content) {
@@ -181,7 +210,6 @@ const clearHistory = async (req, res) => {
     const { sessionId = 'default' } = req.params;
     const db = await getDb();
     
-    // Apaga do SQLite todas as mensagens vinculadas à sessão informada
     await db.run('DELETE FROM messages WHERE session_id = ?', [sessionId]);
     
     logger.info(`Histórico da sessão ${sessionId} removido do banco SQLite com sucesso.`);
