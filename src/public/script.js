@@ -26,13 +26,22 @@ const removeFileBtn = document.getElementById('remove-file-btn');
 // --- ESTADO DA APLICAÇÃO ---
 let conversationHistory = [];
 
-// Gera uma nova sessão toda vez que a página/IA é aberta
-let currentSessionId = `session_${Date.now()}`;
+// Recupera a lista de sessões salvas
 let sessions = JSON.parse(localStorage.getItem('chatSessions')) || [];
 
-// Garante que a sessão atual recém-criada esteja na lista
-if (!sessions.some(s => s.id === currentSessionId)) {
-  sessions.unshift({ id: currentSessionId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' });
+// Recupera o ID da sessão que estava ativa antes do refresh
+let currentSessionId = localStorage.getItem('activeSessionId');
+
+// Se não houver sessão ativa ou se a lista estiver vazia, cria o primeiro chat
+if (!currentSessionId || sessions.length === 0) {
+  currentSessionId = `session_${Date.now()}`;
+  sessions = [{ id: currentSessionId, title: 'Chat Inicial', persona: personaSelect?.value || 'general' }];
+} else {
+  // Garante que o ID salvo no activeSessionId realmente existe na lista de sessões
+  const exists = sessions.some(s => s.id === currentSessionId);
+  if (!exists) {
+    currentSessionId = sessions[0]?.id || `session_${Date.now()}`;
+  }
 }
 
 let attachedFileContent = null;
@@ -334,10 +343,10 @@ async function loadHistory() {
   }
 }
 
-// Inicializa a interface limpa
+// Inicializa a interface mantendo o estado
 saveSessionsToStorage();
 renderSidebar();
-resetChatArea();
+loadHistory(); // Carrega o histórico da sessão atual em vez de resetar para um chat limpo
 
 // --- ENVIO DA MENSAGEM COM STREAMING ---
 chatForm?.addEventListener('submit', async (e) => {
