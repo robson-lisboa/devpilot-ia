@@ -9,13 +9,16 @@ body {
   background-color: #11111b;
   color: #cdd6f4;
   height: 100vh;
-  overflow: hidden;
+  height: 100dvh;
+  overflow: auto; /* Corrigido para permitir o fluxo de rolagem livre */
+  -webkit-overflow-scrolling: touch;
 }
 
 .app-container {
   display: flex;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
 }
 
 /* ================= SIDEBAR ================= */
@@ -196,10 +199,11 @@ body {
 .chat-messages {
   flex: 1;
   padding: 20px;
-  overflow-y: auto;
+  overflow-y: auto; /* Permite rolar independentemente */
   display: flex;
   flex-direction: column;
   gap: 16px;
+  -webkit-overflow-scrolling: touch; /* Suaviza o toque no celular */
 }
 
 .message {
