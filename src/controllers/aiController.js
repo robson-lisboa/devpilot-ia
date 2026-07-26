@@ -2,8 +2,8 @@ require('dotenv').config();
 const Groq = require('groq-sdk');
 const logger = require('../utils/logger');
 const getDb = require('../config/database');
-// 📄 Importa o utilitário de leitura de PDF
-const { extractTextFromPDF } = require('../services/pdfReader');
+// 📄 Importa o utilitário de leitura de PDF diretamente da pasta src/
+const { extractTextFromPDF } = require('../pdfReader');
 
 const groq = new Groq({ 
   apiKey: process.env.GROQ_API_KEY 
