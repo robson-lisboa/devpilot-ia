@@ -63,10 +63,20 @@ const generateResponse = async (req, res) => {
       return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
     }
 
-    // 💡 Extrai também o campo pdfPath
-    const { messages, prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile', pdfPath } = req.body;
+    // 💡 Extrai os campos e obtém o caminho do PDF enviado pelo Multer (req.file)
+    let messages = req.body.messages;
+    if (typeof messages === 'string') {
+      try {
+        messages = JSON.parse(messages);
+      } catch (e) {
+        messages = [];
+      }
+    }
 
-    if (!req.body || Object.keys(req.body).length === 0) {
+    const { prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile' } = req.body;
+    const pdfPath = req.file ? req.file.path : req.body.pdfPath;
+
+    if (!req.body || (Object.keys(req.body).length === 0 && !req.file)) {
       logger.warn('Tentativa de requisição com corpo vazio.');
       return res.status(400).json({ 
         success: false,
@@ -74,7 +84,7 @@ const generateResponse = async (req, res) => {
       });
     }
 
-    // 📄 Processa o arquivo PDF se o caminho for informado no corpo da requisição
+    // 📄 Processa o arquivo PDF se o caminho for informado via Multer
     let pdfContext = "";
     if (pdfPath) {
       try {
@@ -94,14 +104,6 @@ const generateResponse = async (req, res) => {
     };
 
     if (messages && Array.isArray(messages)) {
-      if (messages.length === 0) {
-        logger.warn('Array de mensagens enviado vazio.');
-        return res.status(400).json({ 
-          success: false,
-          error: 'O array "messages" não pode estar vazio.' 
-        });
-      }
-      
       const formattedMessages = [...messages];
       if (pdfContext && formattedMessages.length > 0) {
         const lastIdx = formattedMessages.length - 1;
