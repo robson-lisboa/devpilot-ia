@@ -251,7 +251,7 @@ const generateResponse = async (req, res) => {
       }
     }
 
-    const { prompt, persona = 'general', sessionId = 'default', model = 'llama-3.3-70b-versatile' } = req.body;
+    const { prompt, persona = 'general', sessionId = 'default', model = 'openai/gpt-oss-120b' } = req.body;
     const pdfPath = req.file ? req.file.path : req.body.pdfPath;
 
     if (!req.body || (Object.keys(req.body).length === 0 && !req.file)) {
