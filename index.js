@@ -15,6 +15,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
+app.set('trust proxy', 1); // Render utiliza proxy reverso
 const PORT = process.env.PORT || 3000;
 
 // 1. Libera acesso para a aplicação Web (Front-end)
