@@ -1,23 +1,20 @@
-# Imagem base oficial do Node.js 20 (compatível com @google/genai)
-FROM node:20-alpine
+# Imagem Node.js 20 baseada em Debian Bullseye.
+# A base Debian usa Python 3.9, que mantém distutils para o node-gyp 8 do sqlite3.
+FROM node:20-bullseye-slim
 
-# Define o diretório de trabalho no container
 WORKDIR /app
 
-# Instala ferramentas necessárias para compilar dependências nativas (sqlite3)
-RUN apk add --no-cache python3 make g++
+# Ferramentas necessárias para compilar a dependência nativa sqlite3.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-distutils make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copia os arquivos de dependências
 COPY package*.json ./
 
-# Instala somente as dependências de produção
 RUN npm install --omit=dev
 
-# Copia todo o restante do código para o container
 COPY . .
 
-# Expõe a porta onde o servidor roda
 EXPOSE 3000
 
-# Comando para rodar a aplicação
 CMD ["node", "index.js"]
