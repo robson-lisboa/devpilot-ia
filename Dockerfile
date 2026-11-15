@@ -1,20 +1,19 @@
-# Imagem base oficial do Node.js
-FROM node:18-alpine
+# Node.js 20 em Debian Bookworm.
+FROM node:20-bookworm-slim
 
-# Define o diretório de trabalho no container
 WORKDIR /app
 
-# Copia os arquivos de dependências
+# Compilador e compatibilidade distutils para o node-gyp usado pelo sqlite3.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-setuptools make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 
-# Instala as dependências
-RUN npm install --production
+RUN npm install --omit=dev
 
-# Copia todo o restante do código para o container
 COPY . .
 
-# Expõe a porta onde o servidor roda
 EXPOSE 3000
 
-# Comando para rodar a aplicação
 CMD ["node", "index.js"]
