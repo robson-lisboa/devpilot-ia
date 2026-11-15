@@ -1,12 +1,11 @@
-# Imagem Node.js 20 baseada em Debian Bullseye.
-# A base Debian usa Python 3.9, que mantém distutils para o node-gyp 8 do sqlite3.
-FROM node:20-bullseye-slim
+# Node.js 20 em Debian Bookworm.
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# Ferramentas necessárias para compilar a dependência nativa sqlite3.
+# Compilador e compatibilidade distutils para o node-gyp usado pelo sqlite3.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-distutils make g++ \
+    && apt-get install -y --no-install-recommends python3 python3-setuptools make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
