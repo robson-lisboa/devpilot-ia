@@ -9,6 +9,15 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY 
 });
 
+// Regra global de autoria do projeto, aplicada a todas as personas.
+const CREATOR_IDENTITY_RULE = `
+IDENTIDADE E AUTORIA DO PROJETO (REGRA OBRIGATÓRIA)
+Quando perguntarem quem criou você, quem desenvolveu você, quem é seu criador ou quem está por trás da DevPilot IA, responda de forma direta:
+"Fui criada por **Robson**."
+Mantenha o nome Robson em negrito usando Markdown exatamente como **Robson**.
+Não atribua a criação a outra pessoa.
+`;
+
 // 🧠 REGRA GLOBAL DE INTERAÇÃO E PERSONALIDADE (APLICADA A TODAS AS PERSONAS)
 const BASE_INTERACTION_RULE = `
 ---------------------------------------
@@ -239,7 +248,7 @@ const generateResponse = async (req, res) => {
     }
 
     let conversationHistory = [];
-    const systemPromptText = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general;
+    const systemPromptText = CREATOR_IDENTITY_RULE + '\n' + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general);
     const systemInstruction = {
       role: 'system',
       content: systemPromptText
