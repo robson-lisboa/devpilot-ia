@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const currentGuestId = getGuestId();
 
+  // Renderiza Markdown após sanitização; sem o sanitizador, usa texto puro.
+  function safeMarkdown(markdown) {
+    const source = String(markdown ?? '');
+    const rendered = window.marked ? window.marked.parse(source) : source;
+    return window.DOMPurify ? window.DOMPurify.sanitize(rendered, { USE_PROFILES: { html: true } }) : null;
+  }
+
   // --- ELEMENTOS DO DOM ---
   const chatForm = document.getElementById('chat-form');
   const userInput = document.getElementById('user-input');
@@ -252,7 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const bubbleDiv = document.createElement('div');
     bubbleDiv.classList.add('bubble');
     if (isHtml) {
-      bubbleDiv.innerHTML = content;
+      const safeContent = window.DOMPurify ? window.DOMPurify.sanitize(content, { USE_PROFILES: { html: true } }) : null;
+      if (safeContent !== null) bubbleDiv.innerHTML = safeContent;
+      else bubbleDiv.textContent = content;
     } else {
       bubbleDiv.textContent = content;
     }
@@ -315,8 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
         data.history.forEach(item => {
           conversationHistory.push({ role: item.role, content: item.content });
           if (item.role === 'assistant') {
-            const formatted = window.marked ? marked.parse(item.content) : item.content;
-            appendMessage('assistant', formatted, true);
+            const formatted = safeMarkdown(item.content);
+            appendMessage('assistant', formatted === null ? item.content : formatted, formatted !== null);
           } else {
             appendMessage('user', item.content);
           }
@@ -397,8 +406,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const chunk = decoder.decode(value, { stream: true });
         aiFullResponse += chunk;
 
-        const formatted = window.marked ? marked.parse(aiFullResponse) : aiFullResponse;
-        bubbleDiv.innerHTML = formatted;
+        const formatted = safeMarkdown(aiFullResponse);
+        if (formatted !== null) bubbleDiv.innerHTML = formatted;
+        else bubbleDiv.textContent = aiFullResponse;
 
         bubbleDiv.querySelectorAll('pre code').forEach((block) => {
           if (window.hljs) hljs.highlightElement(block);
