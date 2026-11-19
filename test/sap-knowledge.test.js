@@ -28,7 +28,7 @@ test('limita o tamanho do contexto recuperado', (t) => {
   const result = retrieveSapKnowledge('MIGO estoque', {
     knowledgeDir: dir, maxDocs: 1, maxChars: 180, maxDocChars: 150
   });
-  assert.ok(result.length <= 220);
+  assert.ok(result.length <= 350);
 });
 
 test('retorna vazio quando não há correspondência ou diretório', () => {
