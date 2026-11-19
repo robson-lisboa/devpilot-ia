@@ -262,7 +262,8 @@ const generateResponse = async (req, res) => {
     }
 
     // 💡 Extrai os campos e obtém o caminho do PDF enviado pelo Multer (req.file)
-    let messages = req.body.messages;
+    const body = req.body || {};
+    let messages = body.messages;
     if (typeof messages === 'string') {
       try {
         messages = JSON.parse(messages);
@@ -271,7 +272,7 @@ const generateResponse = async (req, res) => {
       }
     }
 
-    const { prompt, persona = 'general', sessionId = 'default', model = 'openai/gpt-oss-120b' } = req.body;
+    const { prompt, persona = 'general', sessionId = 'default', model = 'openai/gpt-oss-120b' } = body;
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
       return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
     }
@@ -303,7 +304,7 @@ const generateResponse = async (req, res) => {
           attachmentContext = `\n\n[PDF ANEXADO: ${req.file.originalname}]\n"""\n${extracted.slice(0, 16000)}\n"""\n`;
         } else if (allowedTextExtensions.has(extension)) {
           const content = fs.readFileSync(req.file.path, 'utf8');
-          if (content.includes('\\u0000')) {
+          if (content.includes('\u0000')) {
             return res.status(400).json({ success: false, error: 'O arquivo contém dados binários e não pode ser lido como texto.' });
           }
           attachmentContext = `\n\n[ARQUIVO DE TEXTO ANEXADO: ${req.file.originalname}]\n"""\n${content.slice(0, 16000)}\n"""\n`;
@@ -460,12 +461,15 @@ const generateResponse = async (req, res) => {
 
 const getHistory = async (req, res) => {
   try {
-    const guestId = req.headers['x-guest-id'];
-    if (!guestId) {
-      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    const guestId = String(req.headers['x-guest-id'] || '');
+    if (!/^guest_[a-z0-9]{8,80}$/i.test(guestId)) {
+      return res.status(400).json({ success: false, error: 'Identificador de sessão inválido.' });
     }
 
     const { sessionId = 'default' } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
+      return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
+    }
     const db = await getDb();
     const history = await db.all(
       'SELECT role, content FROM messages WHERE session_id = ? AND guest_id = ? ORDER BY id ASC',
@@ -480,12 +484,15 @@ const getHistory = async (req, res) => {
 
 const clearHistory = async (req, res) => {
   try {
-    const guestId = req.headers['x-guest-id'];
-    if (!guestId) {
-      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    const guestId = String(req.headers['x-guest-id'] || '');
+    if (!/^guest_[a-z0-9]{8,80}$/i.test(guestId)) {
+      return res.status(400).json({ success: false, error: 'Identificador de sessão inválido.' });
     }
 
     const { sessionId = 'default' } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
+      return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
+    }
     const db = await getDb();
     
     await db.run('DELETE FROM messages WHERE session_id = ? AND guest_id = ?', [sessionId, guestId]);
