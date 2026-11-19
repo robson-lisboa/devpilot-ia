@@ -330,10 +330,10 @@ Quando o usuário anexar logs, mensagens ou documentos para investigar uma falha
 7. Nível de confiança (baixo, moderado ou alto) e justificativa curta.
 Não invente transações, tabelas, códigos, status, mensagens ou notas SAP. Não transforme correlação em causa raiz. Não recomende alteração em produção, reprocessamento ou mudança de configuração sem validação, autorização e procedimento interno.
 ` : '';
-    const systemPromptText = CREATOR_IDENTITY_RULE + '\\n'
+    const systemPromptText = CREATOR_IDENTITY_RULE + '\n'
       + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general)
-      + '\\n\\n' + REASONING_QUALITY_RULE
-      + (SAP_DIAGNOSTIC_REPORT_RULE ? '\\n\\n' + SAP_DIAGNOSTIC_REPORT_RULE : '')
+      + '\n\n' + REASONING_QUALITY_RULE
+      + (SAP_DIAGNOSTIC_REPORT_RULE ? '\n\n' + SAP_DIAGNOSTIC_REPORT_RULE : '')
       + (sapKnowledgeContext ? '\n\n' + sapKnowledgeContext
         + '\nUse os trechos relevantes como apoio. Diferencie fatos de hipóteses e sinalize dependências de versão ou customização.' : '');
     const systemInstruction = { role: 'system', content: systemPromptText };
