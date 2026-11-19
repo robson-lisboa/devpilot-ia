@@ -35,6 +35,24 @@ O **DevPilot IA** é uma plataforma de chat interativa desenvolvida para auxilia
 
 ---
 
+
+## 📚 Base de Conhecimento SAP
+
+O projeto inclui uma base inicial de documentação técnica em `src/knowledge/sap/`, consultada automaticamente pelo backend para enriquecer perguntas relacionadas a SAP. A recuperação seleciona os documentos mais relevantes, em vez de enviar toda a base em cada pergunta.
+
+Conteúdos incluídos:
+- Fundamentos de SAP PP e PP-PI.
+- SAP MM, estoque, movimentações e lotes.
+- SAP QM, inspeções e qualidade.
+- Integração SAP, IDoc, MES e PAS-X.
+- Método de troubleshooting e análise de causa raiz.
+
+A documentação é material didático independente e deve ser conferida com o SAP Help Portal, a versão instalada e os procedimentos aprovados da organização. Não contém documentação proprietária da SAP nem substitui SAP Notes, guias oficiais ou instruções internas validadas.
+
+Fontes oficiais:
+- [SAP Help Portal](https://help.sap.com/)
+- [SAP Learning](https://learning.sap.com/)
+
 ## 🛠️ Tecnologias Utilizadas
 
 * **Backend:** Node.js, Express, SQLite3, Groq SDK, Winston Logger.
