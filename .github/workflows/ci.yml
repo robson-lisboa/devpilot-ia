@@ -23,5 +23,8 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Validar sintaxe JavaScript
+        run: npm test
+
       - name: Validar Build da Imagem Docker
         run: docker build -t devpilot-ia:test .

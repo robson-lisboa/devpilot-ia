@@ -253,25 +253,33 @@ async function buildConversationContext(db, sessionId, guestId, incomingMessages
 }
 
 const generateResponse = async (req, res) => {
+  const uploadedFilePath = req.file?.path;
   try {
     // 🛡️ Captura o guestId enviado pelo cabeçalho
-    const guestId = req.headers['x-guest-id'];
-    if (!guestId) {
-      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    const guestId = String(req.headers['x-guest-id'] || '');
+    if (!/^guest_[a-z0-9]{8,80}$/i.test(guestId)) {
+      return res.status(400).json({ success: false, error: 'Identificador de sessão inválido. Atualize a página e tente novamente.' });
     }
 
     // 💡 Extrai os campos e obtém o caminho do PDF enviado pelo Multer (req.file)
-    let messages = req.body.messages;
+    const body = req.body || {};
+    let messages = body.messages;
     if (typeof messages === 'string') {
       try {
         messages = JSON.parse(messages);
       } catch (e) {
-        messages = [];
+        return res.status(400).json({ success: false, error: 'O histórico enviado não está em um formato válido.' });
       }
     }
 
-    const { prompt, persona = 'general', sessionId = 'default', model = 'openai/gpt-oss-120b' } = req.body;
-    const pdfPath = req.file ? req.file.path : req.body.pdfPath;
+    const { prompt, persona = 'general', sessionId = 'default', model = 'openai/gpt-oss-120b' } = body;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
+      return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
+    }
+    const allowedPersonas = new Set(['general', 'python', 'devops', 'reviewer', 'sap', 'sap_expert', 'sap_master']);
+    if (!allowedPersonas.has(persona)) {
+      return res.status(400).json({ success: false, error: 'Especialidade selecionada inválida.' });
+    }
 
     if (!req.body || (Object.keys(req.body).length === 0 && !req.file)) {
       logger.warn('Tentativa de requisição com corpo vazio.');
@@ -281,20 +289,40 @@ const generateResponse = async (req, res) => {
       });
     }
 
-    // 📄 Processa o arquivo PDF se o caminho for informado via Multer
-    let pdfContext = "";
-    if (pdfPath) {
+    // Lê somente o arquivo temporário criado pelo Multer. Nunca aceita caminhos vindos do corpo da requisição.
+    let attachmentContext = "";
+    if (req.file) {
+      const extension = path.extname(req.file.originalname || '').toLowerCase();
+      const allowedTextExtensions = new Set(['.txt', '.csv', '.json', '.py', '.js', '.html', '.css', '.md']);
       try {
-        const pdfText = await extractTextFromPDF(pdfPath);
-        pdfContext = `\n\n[DOCUMENTO PDF ANEXADO PELO USUÁRIO]:\n"""\n${pdfText.slice(0, 4000)}\n"""\n`;
-        logger.info(`Texto extraído do PDF com sucesso para a sessão ${sessionId} (Guest: ${guestId}).`);
-      } catch (pdfError) {
-        logger.error(`Erro ao ler PDF fornecido (${pdfPath}): ${pdfError.message}`);
+        if (extension === '.pdf') {
+          const signature = fs.readFileSync(req.file.path).subarray(0, 5).toString('ascii');
+          if (signature !== '%PDF-') {
+            return res.status(400).json({ success: false, error: 'O arquivo enviado não parece ser um PDF válido.' });
+          }
+          const extracted = await extractTextFromPDF(req.file.path);
+          attachmentContext = `\n\n[PDF ANEXADO: ${req.file.originalname}]\n"""\n${extracted.slice(0, 16000)}\n"""\n`;
+        } else if (allowedTextExtensions.has(extension)) {
+          const content = fs.readFileSync(req.file.path, 'utf8');
+          if (content.includes('\u0000')) {
+            return res.status(400).json({ success: false, error: 'O arquivo contém dados binários e não pode ser lido como texto.' });
+          }
+          attachmentContext = `\n\n[ARQUIVO DE TEXTO ANEXADO: ${req.file.originalname}]\n"""\n${content.slice(0, 16000)}\n"""\n`;
+        } else {
+          return res.status(400).json({ success: false, error: 'Formato de arquivo não permitido.' });
+        }
+        logger.info(`Anexo processado para a sessão ${sessionId} (Guest: ${guestId}).`);
+      } catch (fileError) {
+        logger.error(`Falha ao processar anexo: ${fileError.message}`);
+        return res.status(400).json({ success: false, error: 'Não foi possível ler o arquivo anexado. Verifique o formato e tente novamente.' });
       }
     }
 
     let conversationHistory = [];
     const incomingMessages = Array.isArray(messages) ? messages : [];
+    if (incomingMessages.length > 24 || incomingMessages.some(message => !message || !['user', 'assistant'].includes(message.role) || (typeof message.content === 'string' && message.content.length > 20000))) {
+      return res.status(400).json({ success: false, error: 'Histórico inválido ou muito extenso. Limite a conversa às últimas 24 mensagens.' });
+    }
     const latestIncoming = [...incomingMessages].reverse().find(m => m && m.role === 'user');
     const latestUserQuestion = latestIncoming?.content || prompt || '';
     const sapKnowledgeContext = retrieveSapKnowledge(
@@ -318,12 +346,12 @@ const generateResponse = async (req, res) => {
         contextMessages.push({ role: 'user', content: prompt.trim() });
       }
 
-      if (pdfContext && contextMessages.length > 0) {
+      if (attachmentContext && contextMessages.length > 0) {
         const lastIdx = contextMessages.length - 1;
         if (contextMessages[lastIdx].role === 'user' && typeof contextMessages[lastIdx].content === 'string') {
           contextMessages[lastIdx] = {
             ...contextMessages[lastIdx],
-            content: pdfContext + contextMessages[lastIdx].content
+            content: attachmentContext + contextMessages[lastIdx].content
           };
         }
       }
@@ -419,21 +447,29 @@ const generateResponse = async (req, res) => {
       return res.status(500).json({
         success: false,
         error: 'Falha interna ao processar a requisição com a IA.',
-        details: error.message
       });
     }
     res.end();
+  } finally {
+    if (uploadedFilePath) {
+      fs.promises.unlink(uploadedFilePath).catch(cleanupError =>
+        logger.warn('Não foi possível remover o arquivo temporário: ' + cleanupError.message)
+      );
+    }
   }
 };
 
 const getHistory = async (req, res) => {
   try {
-    const guestId = req.headers['x-guest-id'];
-    if (!guestId) {
-      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    const guestId = String(req.headers['x-guest-id'] || '');
+    if (!/^guest_[a-z0-9]{8,80}$/i.test(guestId)) {
+      return res.status(400).json({ success: false, error: 'Identificador de sessão inválido.' });
     }
 
     const { sessionId = 'default' } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
+      return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
+    }
     const db = await getDb();
     const history = await db.all(
       'SELECT role, content FROM messages WHERE session_id = ? AND guest_id = ? ORDER BY id ASC',
@@ -442,18 +478,21 @@ const getHistory = async (req, res) => {
     return res.json({ success: true, history });
   } catch (error) {
     logger.error(`Erro ao carregar histórico: ${error.message}`);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: 'Não foi possível carregar o histórico agora.' });
   }
 };
 
 const clearHistory = async (req, res) => {
   try {
-    const guestId = req.headers['x-guest-id'];
-    if (!guestId) {
-      return res.status(400).json({ success: false, error: 'X-Guest-ID não fornecido.' });
+    const guestId = String(req.headers['x-guest-id'] || '');
+    if (!/^guest_[a-z0-9]{8,80}$/i.test(guestId)) {
+      return res.status(400).json({ success: false, error: 'Identificador de sessão inválido.' });
     }
 
     const { sessionId = 'default' } = req.params;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(String(sessionId))) {
+      return res.status(400).json({ success: false, error: 'Identificador da conversa inválido.' });
+    }
     const db = await getDb();
     
     await db.run('DELETE FROM messages WHERE session_id = ? AND guest_id = ?', [sessionId, guestId]);
@@ -462,7 +501,7 @@ const clearHistory = async (req, res) => {
     return res.json({ success: true, message: 'Histórico apagado com sucesso!' });
   } catch (error) {
     logger.error(`Erro ao apagar histórico: ${error.message}`);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: 'Não foi possível apagar o histórico agora.' });
   }
 };
 
