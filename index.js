@@ -15,7 +15,17 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render utiliza proxy reverso
+
+// Cabeçalhos básicos de segurança para respostas HTTP.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  next();
+});
 const PORT = process.env.PORT || 3000;
 
 // 1. Libera acesso para a aplicação Web (Front-end)
