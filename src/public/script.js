@@ -3,7 +3,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function getGuestId() {
     let guestId = localStorage.getItem('devpilot_guest_id');
     if (!guestId) {
-      guestId = 'guest_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const randomId = window.crypto?.randomUUID
+        ? window.crypto.randomUUID().replace(/-/g, '')
+        : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      guestId = 'guest_' + randomId;
       localStorage.setItem('devpilot_guest_id', guestId);
     }
     return guestId;
