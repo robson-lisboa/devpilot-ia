@@ -290,6 +290,36 @@ const generateResponse = async (req, res) => {
       });
     }
 
+    // Resposta determinística para perguntas sobre a autoria da DevPilot.
+    // Evita que o modelo atribua incorretamente a criação a outra empresa ou pessoa.
+    const lastUserMessageForIdentity = [...conversationHistory].reverse().find(m => m.role === 'user');
+    const identityQuestion = String(lastUserMessageForIdentity?.content || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+    const asksWhoCreated = /\\b(quem|who)\\b.{0,50}\\b(criou|desenvolveu|desenvolveu|create|created|developed|fez|feita|feita por|esta por tras|por tras)\\b.{0,50}\\b(voce|devpilot|sua criacao|seu desenvolvimento|you|yourself)\\b|\\b(quem|who)\\b.{0,35}\\b(e o|is the)\\b.{0,20}\\b(criador|desenvolvedor|creator|developer)\\b.{0,30}\\b(voce|devpilot|you)\\b/.test(identityQuestion)
+      || /\\b(quem criou voce|quem desenvolveu voce|quem fez voce|quem e seu criador|quem e sua criadora|quem esta por tras da devpilot)\\b/.test(identityQuestion);
+
+    if (asksWhoCreated) {
+      const identityAnswer = 'Fui criada por **Robson**.';
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.write(identityAnswer);
+      res.end();
+
+      const db = await getDb();
+      if (lastUserMessageForIdentity) {
+        await db.run(
+          'INSERT INTO messages (session_id, guest_id, role, content) VALUES (?, ?, ?, ?)',
+          [sessionId, guestId, 'user', lastUserMessageForIdentity.content]
+        );
+        await db.run(
+          'INSERT INTO messages (session_id, guest_id, role, content) VALUES (?, ?, ?, ?)',
+          [sessionId, guestId, 'assistant', identityAnswer]
+        );
+      }
+      logger.info(`Pergunta sobre autoria respondida diretamente para o Guest: ${guestId}.`);
+      return;
+    }
+
     logger.info(`Iniciando streaming [Guest: ${guestId}] [Modelo: ${model}] [Persona: ${persona}] [Sessão: ${sessionId}]...`);
 
     // Configura os cabeçalhos para resposta em fluxo contínuo (Streaming)
