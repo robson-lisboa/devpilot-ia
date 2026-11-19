@@ -478,7 +478,7 @@ const getHistory = async (req, res) => {
     return res.json({ success: true, history });
   } catch (error) {
     logger.error(`Erro ao carregar histórico: ${error.message}`);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: 'Não foi possível carregar o histórico agora.' });
   }
 };
 
@@ -501,7 +501,7 @@ const clearHistory = async (req, res) => {
     return res.json({ success: true, message: 'Histórico apagado com sucesso!' });
   } catch (error) {
     logger.error(`Erro ao apagar histórico: ${error.message}`);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: 'Não foi possível apagar o histórico agora.' });
   }
 };
 
