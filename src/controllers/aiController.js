@@ -2,6 +2,8 @@ require('dotenv').config();
 const Groq = require('groq-sdk');
 const logger = require('../utils/logger');
 const getDb = require('../config/database');
+const fs = require('fs');
+const path = require('path');
 // 📄 Importa o utilitário de leitura de PDF diretamente da pasta src/
 const { extractTextFromPDF } = require('../pdfReader');
 
@@ -206,6 +208,38 @@ Seu objetivo é encontrar a causa raiz com evidências e orientar o usuário at�
 
 };
 
+
+const SAP_KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge', 'sap');
+
+// Recupera os documentos SAP mais relacionados à pergunta atual.
+function retrieveSapKnowledge(question, maxDocs = 3) {
+  try {
+    const files = fs.readdirSync(SAP_KNOWLEDGE_DIR).filter(name => name.endsWith('.md'));
+    const queryTokens = String(question || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .split(/[^a-z0-9]+/).filter(token => token.length > 2);
+    if (!queryTokens.length) return '';
+
+    const ranked = files.map(file => {
+      const content = fs.readFileSync(path.join(SAP_KNOWLEDGE_DIR, file), 'utf8');
+      const searchable = content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const score = [...new Set(queryTokens)].reduce((total, token) =>
+        total + Math.min(Math.max(searchable.split(token).length - 1, 0), 5), 0);
+      return { file, content, score };
+    }).filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxDocs);
+
+    if (!ranked.length) return '';
+    return '\n\n[BASE DE CONHECIMENTO SAP — TRECHOS RECUPERADOS]:\n'
+      + ranked.map(item => '### ' + item.file + '\n' + item.content.slice(0, 9000)).join('\n\n')
+      + '\n[FIM DA BASE SAP]\n';
+  } catch (error) {
+    logger.error('Falha ao consultar base SAP local: ' + error.message);
+    return '';
+  }
+}
+
 const generateResponse = async (req, res) => {
   try {
     // 🛡️ Captura o guestId enviado pelo cabeçalho
@@ -248,7 +282,10 @@ const generateResponse = async (req, res) => {
     }
 
     let conversationHistory = [];
-    const systemPromptText = CREATOR_IDENTITY_RULE + '\n' + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general);
+    const latestUserQuestion = [...(Array.isArray(messages) ? messages : [])].reverse().find(m => m.role === 'user')?.content || prompt || '';
+    const sapKnowledgeContext = retrieveSapKnowledge(latestUserQuestion);
+    const systemPromptText = CREATOR_IDENTITY_RULE + '\n' + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general)
+      + (sapKnowledgeContext ? '\n\n' + sapKnowledgeContext + '\nResponda com base nos trechos relevantes acima quando aplicáveis. Não trate hipóteses como fatos e informe quando algo depender da versão ou customização do ambiente.' : '');
     const systemInstruction = {
       role: 'system',
       content: systemPromptText
