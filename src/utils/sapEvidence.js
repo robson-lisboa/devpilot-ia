@@ -40,14 +40,7 @@ function analyzeSapEvidence(input) {
     const code = line.match(/\b[A-Z][A-Z0-9]\s?\d{3}\b/);
     if (code) messageCodes.push(code[0].replace(/\s+/g, ' '));
 
-    // Remove negações explícitas antes de classificar a linha como evidência.
-    // Ex.: "sem erro" e "no error" não devem gerar falso positivo.
-    const positiveSignalText = line.replace(
-      /\b(?:sem|nenhum(?:a)?|não há|nao ha|no|without)\s+(?:erro|error|falha|failure)\b/gi,
-      ' '
-    );
-
-    if (/\b(error|erro|falha|failed|exception|abend|timeout|rejeitad|bloquead)\b|\bstatus\s*[=:]/i.test(positiveSignalText)
+    if (/(error|erro|falha|failed|exception|abend|timeout|rejeitad|bloquead|status\s*[=:])/i.test(line)
       && evidenceLines.length < MAX_EVIDENCE_LINES) {
       evidenceLines.push(line.slice(0, 300));
     }
