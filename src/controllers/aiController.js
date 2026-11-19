@@ -7,6 +7,7 @@ const path = require('path');
 // 📄 Importa o utilitário de leitura de PDF diretamente da pasta src/
 const { extractTextFromPDF } = require('../pdfReader');
 const { retrieveSapKnowledge } = require('../utils/sapKnowledge');
+const { formatSapEvidenceContext } = require('../utils/sapEvidence');
 
 const groq = new Groq({ 
   apiKey: process.env.GROQ_API_KEY 
@@ -274,12 +275,16 @@ const generateResponse = async (req, res) => {
           }
           const extracted = await extractTextFromPDF(req.file.path);
           attachmentContext = `\n\n[PDF ANEXADO: ${req.file.originalname}]\n"""\n${extracted.slice(0, 16000)}\n"""\n`;
+          const pdfEvidence = formatSapEvidenceContext(extracted);
+          if (pdfEvidence) attachmentContext += '\n\n' + pdfEvidence;
         } else if (allowedTextExtensions.has(extension)) {
           const content = fs.readFileSync(req.file.path, 'utf8');
           if (content.includes('\u0000')) {
             return res.status(400).json({ success: false, error: 'O arquivo contém dados binários e não pode ser lido como texto.' });
           }
           attachmentContext = `\n\n[ARQUIVO DE TEXTO ANEXADO: ${req.file.originalname}]\n"""\n${content.slice(0, 16000)}\n"""\n`;
+          const textEvidence = formatSapEvidenceContext(content);
+          if (textEvidence) attachmentContext += '\n\n' + textEvidence;
         } else {
           return res.status(400).json({ success: false, error: 'Formato de arquivo não permitido.' });
         }
