@@ -293,9 +293,9 @@ const generateResponse = async (req, res) => {
     // Resposta determinística para perguntas sobre a autoria da DevPilot.
     // Evita que o modelo atribua incorretamente a criação a outra empresa ou pessoa.
     const lastUserMessageForIdentity = [...conversationHistory].reverse().find(m => m.role === 'user');
-    const identityQuestion = String(lastUserMessageForIdentity?.content || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
-    const asksWhoCreated = /\\b(quem|who)\\b.{0,50}\\b(criou|desenvolveu|desenvolveu|create|created|developed|fez|feita|feita por|esta por tras|por tras)\\b.{0,50}\\b(voce|devpilot|sua criacao|seu desenvolvimento|you|yourself)\\b|\\b(quem|who)\\b.{0,35}\\b(e o|is the)\\b.{0,20}\\b(criador|desenvolvedor|creator|developer)\\b.{0,30}\\b(voce|devpilot|you)\\b/.test(identityQuestion)
-      || /\\b(quem criou voce|quem desenvolveu voce|quem fez voce|quem e seu criador|quem e sua criadora|quem esta por tras da devpilot)\\b/.test(identityQuestion);
+    const identityQuestion = String(lastUserMessageForIdentity?.content || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const asksWhoCreated = /\b(quem|who)\b.{0,50}\b(criou|desenvolveu|desenvolveu|create|created|developed|fez|feita|feita por|esta por tras|por tras)\b.{0,50}\b(voce|devpilot|sua criacao|seu desenvolvimento|you|yourself)\b|\b(quem|who)\b.{0,35}\b(e o|is the)\b.{0,20}\b(criador|desenvolvedor|creator|developer)\b.{0,30}\b(voce|devpilot|you)\b/.test(identityQuestion)
+      || /\b(quem criou voce|quem desenvolveu voce|quem fez voce|quem e seu criador|quem e sua criadora|quem esta por tras da devpilot)\b/.test(identityQuestion);
 
     if (asksWhoCreated) {
       const identityAnswer = 'Fui criada por **Robson**.';
