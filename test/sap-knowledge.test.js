@@ -34,3 +34,19 @@ test('limita o tamanho do contexto recuperado', (t) => {
 test('retorna vazio quando não há correspondência ou diretório', () => {
   assert.equal(retrieveSapKnowledge('zzzz desconhecido', { knowledgeDir: '/caminho/inexistente' }), '');
 });
+
+test('base SAP inclui os principais domínios funcionais e técnicos', () => {
+  const knowledgeDir = path.join(__dirname, '..', 'src', 'knowledge', 'sap');
+  const expectedFiles = [
+    '00-ecossistema-sap.md', 'pp-pppi.md', 'qm.md', 'ewm-wm.md',
+    'pm-eam.md', 'sd.md', 'fi.md', 'co.md', 'abap.md',
+    'basis.md', 'hana.md', 'integracoes.md'
+  ];
+  for (const file of expectedFiles) {
+    assert.ok(fs.existsSync(path.join(knowledgeDir, file)), 'Documento ausente: ' + file);
+  }
+  const integration = retrieveSapKnowledge('Como investigar falha de IDoc e integração?', {
+    knowledgeDir, maxDocs: 4, maxChars: 10000, maxDocChars: 3000
+  });
+  assert.match(integration, /integracoes\.md/);
+});
