@@ -221,6 +221,37 @@ function retrieveSapKnowledge(question, maxDocs = 3) {
   }
 }
 
+// Recupera o histórico persistido quando o cliente envia apenas a mensagem atual.
+// O histórico é isolado por sessão e visitante para não misturar conversas.
+async function buildConversationContext(db, sessionId, guestId, incomingMessages) {
+  const validMessages = (Array.isArray(incomingMessages) ? incomingMessages : [])
+    .filter(message => message && ['user', 'assistant'].includes(message.role)
+      && (typeof message.content === 'string' || Array.isArray(message.content)))
+    .map(message => ({ role: message.role, content: message.content }));
+
+  // Se o front-end já envia a conversa completa, respeita esse histórico.
+  const hasConversation = validMessages.length > 1;
+  if (hasConversation) return validMessages.slice(-24);
+
+  const stored = await db.all(
+    'SELECT role, content FROM messages WHERE session_id = ? AND guest_id = ? ORDER BY id DESC LIMIT 24',
+    [sessionId, guestId]
+  );
+  const previous = stored.reverse()
+    .filter(message => ['user', 'assistant'].includes(message.role))
+    .map(message => ({ role: message.role, content: message.content }));
+
+  // Evita repetir a pergunta atual caso ela já tenha sido gravada em uma tentativa anterior.
+  const current = validMessages[validMessages.length - 1];
+  if (current) {
+    const lastStored = previous[previous.length - 1];
+    if (!lastStored || lastStored.role !== current.role || lastStored.content !== current.content) {
+      previous.push(current);
+    }
+  }
+  return previous.slice(-24);
+}
+
 const generateResponse = async (req, res) => {
   try {
     // 🛡️ Captura o guestId enviado pelo cabeçalho
@@ -263,48 +294,46 @@ const generateResponse = async (req, res) => {
     }
 
     let conversationHistory = [];
-    const latestUserQuestion = [...(Array.isArray(messages) ? messages : [])].reverse().find(m => m.role === 'user')?.content || prompt || '';
-    const sapKnowledgeContext = retrieveSapKnowledge(latestUserQuestion);
-    const systemPromptText = CREATOR_IDENTITY_RULE + '\n' + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general) + '\n\n' + BASE_INTERACTION_RULE
-      + (sapKnowledgeContext ? '\n\n' + sapKnowledgeContext + '\nResponda com base nos trechos relevantes acima quando aplicáveis. Não trate hipóteses como fatos e informe quando algo depender da versão ou customização do ambiente.' : '');
-    const systemInstruction = {
-      role: 'system',
-      content: systemPromptText
-    };
+    const incomingMessages = Array.isArray(messages) ? messages : [];
+    const latestIncoming = [...incomingMessages].reverse().find(m => m && m.role === 'user');
+    const latestUserQuestion = latestIncoming?.content || prompt || '';
+    const sapKnowledgeContext = retrieveSapKnowledge(
+      typeof latestUserQuestion === 'string' ? latestUserQuestion : JSON.stringify(latestUserQuestion)
+    );
+    const systemPromptText = CREATOR_IDENTITY_RULE + '\n'
+      + (PERSONA_PROMPTS[persona] || PERSONA_PROMPTS.general)
+      + '\n\n' + BASE_INTERACTION_RULE
+      + (sapKnowledgeContext ? '\n\n' + sapKnowledgeContext
+        + '\nUse os trechos relevantes como apoio. Diferencie fatos de hipóteses e sinalize dependências de versão ou customização.' : '');
+    const systemInstruction = { role: 'system', content: systemPromptText };
 
-    if (messages && Array.isArray(messages)) {
-      const formattedMessages = [...messages];
-      if (pdfContext && formattedMessages.length > 0) {
-        const lastIdx = formattedMessages.length - 1;
-        if (formattedMessages[lastIdx].role === 'user') {
-          formattedMessages[lastIdx] = {
-            ...formattedMessages[lastIdx],
-            content: `${pdfContext}${formattedMessages[lastIdx].content}`
+    if (incomingMessages.length > 0 || (prompt && typeof prompt === 'string' && prompt.trim())) {
+      if (prompt && typeof prompt === 'string' && !prompt.trim() && incomingMessages.length === 0) {
+        return res.status(400).json({ success: false, error: 'O campo "prompt" não pode conter apenas espaços em branco.' });
+      }
+
+      const db = await getDb();
+      let contextMessages = await buildConversationContext(db, sessionId, guestId, incomingMessages);
+      if (incomingMessages.length === 0 && prompt && typeof prompt === 'string') {
+        contextMessages.push({ role: 'user', content: prompt.trim() });
+      }
+
+      if (pdfContext && contextMessages.length > 0) {
+        const lastIdx = contextMessages.length - 1;
+        if (contextMessages[lastIdx].role === 'user' && typeof contextMessages[lastIdx].content === 'string') {
+          contextMessages[lastIdx] = {
+            ...contextMessages[lastIdx],
+            content: pdfContext + contextMessages[lastIdx].content
           };
         }
       }
 
-      conversationHistory = [systemInstruction, ...formattedMessages];
-    } else if (prompt && typeof prompt === 'string') {
-      if (prompt.trim().length === 0) {
-        logger.warn('Prompt enviado contendo apenas espaços.');
-        return res.status(400).json({ 
-          success: false,
-          error: 'O campo "prompt" não pode conter apenas espaços em branco.' 
-        });
-      }
-      
-      const finalPrompt = `${pdfContext}${prompt.trim()}`;
-
-      conversationHistory = [
-        systemInstruction,
-        { role: 'user', content: finalPrompt }
-      ];
+      conversationHistory = [systemInstruction, ...contextMessages.slice(-24)];
     } else {
       logger.warn('Requisição enviada sem os campos obrigatórios.');
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'É necessário enviar um "prompt" (string) ou um array de "messages".' 
+        error: 'É necessário enviar um "prompt" (string) ou um array de "messages".'
       });
     }
 
